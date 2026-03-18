@@ -1,0 +1,20 @@
+# Single-account example configuration
+aws_region               = "us-east-1"
+agent_space_name         = "MyCompanyAgentSpace"
+agent_space_description  = "DevOps monitoring for production workloads"
+enable_operator_app      = true
+auth_flow                = "iam"
+
+# enable_webhook = true
+# event_channel_service_id = null # optional; if null and enable_webhook=true, script will attempt to register/discover it
+
+# resource_discovery_tags = {
+#   Environment = "production"
+#   Application = "myapp"
+# }
+
+tags = {
+  Project   = "devops-agent"
+  ManagedBy = "terraform"
+}
+
