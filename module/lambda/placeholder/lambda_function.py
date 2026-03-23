@@ -12,19 +12,40 @@ from datetime import datetime, timezone
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-WEBHOOK_URL        = os.environ["WEBHOOK_URL"]
 WEBHOOK_SECRET_ARN = os.environ["WEBHOOK_SECRET_ARN"]
+WEBHOOK_URL_ENV = os.environ.get("WEBHOOK_URL")
 
-# Cache secret in Lambda execution context to avoid repeated Secrets Manager calls
-_secret_cache: str | None = None
+# Cache (webhook_url, signing_secret) in Lambda execution context
+_webhook_cache: tuple[str, str] | None = None
 
-def get_webhook_secret() -> str:
-    global _secret_cache
-    if _secret_cache is None:
+
+def get_webhook_url_and_secret() -> tuple[str, str]:
+    """Resolve URL and HMAC secret from Secrets Manager JSON (webhookUrl, webhookSecret)
+    or raw secret string plus optional WEBHOOK_URL env (legacy)."""
+    global _webhook_cache
+    if _webhook_cache is None:
         client = boto3.client("secretsmanager")
         response = client.get_secret_value(SecretId=WEBHOOK_SECRET_ARN)
-        _secret_cache = response["SecretString"]
-    return _secret_cache
+        raw = response["SecretString"]
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict) and "webhookUrl" in data:
+                url = str(data["webhookUrl"])
+                secret = str(data.get("webhookSecret") or "")
+                if not secret:
+                    raise ValueError(
+                        "webhookSecret is empty in JSON secret; set var.webhook_signing_secret or update the secret"
+                    )
+                _webhook_cache = (url, secret)
+            else:
+                raise ValueError("JSON secret must include webhookUrl")
+        except json.JSONDecodeError:
+            if not WEBHOOK_URL_ENV:
+                raise ValueError(
+                    "WEBHOOK_URL is required when the secret value is not JSON"
+                ) from None
+            _webhook_cache = (WEBHOOK_URL_ENV, raw)
+    return _webhook_cache
 
 # Map CloudWatch alarm severity to DevOps Agent priority
 SEVERITY_MAP = {
@@ -94,18 +115,20 @@ def lambda_handler(event, context):
         body = json.dumps(payload)
         logger.info("Constructed payload for DevOps Agent: %s", body)
 
+        webhook_url, signing_secret = get_webhook_url_and_secret()
+
         # HMAC-SHA256 signature  →  base64( HMAC( "{timestamp}:{body}" ) )
         signing_input = f"{timestamp}:{body}"
         signature = base64.b64encode(
             hmac.new(
-                get_webhook_secret().encode("utf-8"),
+                signing_secret.encode("utf-8"),
                 signing_input.encode("utf-8"),
                 hashlib.sha256,
             ).digest()
         ).decode("utf-8")
 
         req = urllib.request.Request(
-            WEBHOOK_URL,
+            webhook_url,
             data=body.encode("utf-8"),
             headers={
                 "Content-Type":            "application/json",
@@ -115,7 +138,7 @@ def lambda_handler(event, context):
             method="POST",
         )
 
-        logger.info("Sending request to DevOps Agent webhook at %s", WEBHOOK_URL)
+        logger.info("Sending request to DevOps Agent webhook at %s", webhook_url)
 
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:

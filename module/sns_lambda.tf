@@ -3,6 +3,15 @@
 # Replace code under lambda/placeholder/ or set lambda_source_dir to your package.
 # ------------------------------------------------------------------------------
 
+locals {
+  sns_lambda_env = merge(
+    var.sns_lambda_environment,
+    length(aws_secretsmanager_secret.webhook_credentials) > 0 ? {
+      WEBHOOK_SECRET_ARN = aws_secretsmanager_secret.webhook_credentials[0].arn
+    } : {}
+  )
+}
+
 data "archive_file" "sns_lambda_zip" {
   count = var.enable_sns_lambda ? 1 : 0
 
@@ -40,6 +49,24 @@ resource "aws_iam_role_policy_attachment" "sns_lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy" "sns_lambda_webhook_secret" {
+  count = var.enable_sns_lambda && length(aws_secretsmanager_secret.webhook_credentials) > 0 ? 1 : 0
+
+  name = "${local.iam_name_prefix}-SnsLambda-WebhookSecret"
+  role = aws_iam_role.sns_lambda[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = aws_secretsmanager_secret.webhook_credentials[0].arn
+      }
+    ]
+  })
+}
+
 resource "aws_lambda_function" "sns_handler" {
   count = var.enable_sns_lambda ? 1 : 0
 
@@ -54,6 +81,13 @@ resource "aws_lambda_function" "sns_handler" {
   source_code_hash = data.archive_file.sns_lambda_zip[0].output_base64sha256
 
   tags = var.tags
+
+  dynamic "environment" {
+    for_each = length(local.sns_lambda_env) > 0 ? [1] : []
+    content {
+      variables = local.sns_lambda_env
+    }
+  }
 
   depends_on = [aws_iam_role_policy_attachment.sns_lambda_basic]
 }

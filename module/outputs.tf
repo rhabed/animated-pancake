@@ -37,6 +37,11 @@ output "event_channel_association_id" {
   value       = length(awscc_devopsagent_association.event_channel) > 0 ? awscc_devopsagent_association.event_channel[0].association_id : null
 }
 
+output "webhook_credentials_secret_arn" {
+  description = "Secrets Manager ARN for JSON credentials (webhookUrl, webhookSecret) when store_webhook_credentials_in_secrets_manager is true; null otherwise."
+  value       = length(aws_secretsmanager_secret.webhook_credentials) > 0 ? aws_secretsmanager_secret.webhook_credentials[0].arn : null
+}
+
 output "sns_topic_arn" {
   description = "ARN of the SNS topic that invokes the Lambda (null when enable_sns_lambda is false)."
   value       = length(aws_sns_topic.notifications) > 0 ? aws_sns_topic.notifications[0].arn : null
@@ -58,7 +63,7 @@ output "manual_setup_instructions" {
     Next steps:
     1. Verify: aws devopsagent get-agent-space --agent-space-id ${awscc_devopsagent_agent_space.this.agent_space_id} --endpoint-url "${local.devopsagent_endpoint_url}" --region ${var.aws_region}
     2. List associations: aws devopsagent list-associations --agent-space-id ${awscc_devopsagent_agent_space.this.agent_space_id} --endpoint-url "${local.devopsagent_endpoint_url}" --region ${var.aws_region}
-    3. If you enabled Event Channel, fetch the webhook URL:
+    3. If you enabled Event Channel, webhook URL (and optional signing secret) are written to Secrets Manager when store_webhook_credentials_in_secrets_manager is true (see output webhook_credentials_secret_arn). You can also fetch the URL with:
        aws devopsagent list-webhooks --agent-space-id ${awscc_devopsagent_agent_space.this.agent_space_id} --association-id <EVENT_CHANNEL_ASSOCIATION_ID> --endpoint-url "${local.devopsagent_endpoint_url}" --region ${var.aws_region}
     4. Access AWS DevOps Agent: https://console.aws.amazon.com/devopsagent/
   EOT

@@ -4,6 +4,12 @@ set -euo pipefail
 # Terraform external data source contract:
 # - Reads JSON from stdin
 # - Writes JSON to stdout
+#
+# This script only registers the eventChannel (webhook) *service* and returns
+# service_id for the Event Channel association. It does not produce the webhook
+# URL or HMAC signing secret — those exist only after the association is created
+# and ListWebhooks can run (see module/scripts/store-webhook-credentials.sh and
+# webhook-secrets.tf for writing URL + optional secret to AWS Secrets Manager).
 
 in="$(cat)"
 region="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read() or "{}").get("region","us-east-1"))' <<<"$in")"

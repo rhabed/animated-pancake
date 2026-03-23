@@ -78,6 +78,19 @@ variable "event_channel_service_id" {
   default     = null
 }
 
+variable "store_webhook_credentials_in_secrets_manager" {
+  description = "When enable_webhook is true, create an AWS Secrets Manager secret and populate it after the Event Channel association exists. The webhook URL is read from the DevOps Agent API; the signing secret is not returned by the API and must be supplied via webhook_signing_secret if you want it stored here."
+  type        = bool
+  default     = true
+}
+
+variable "webhook_signing_secret" {
+  description = "Optional HMAC signing secret for the generic webhook (e.g. from the DevOps Agent console). The ListWebhooks API does not return this value; omit to store only webhookUrl in Secrets Manager until you update the secret manually."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
 variable "enable_sns_lambda" {
   description = "When true, create an SNS topic that invokes a Lambda function (you can replace the placeholder code under lambda/placeholder/ or set lambda_source_dir)."
   type        = bool
@@ -112,5 +125,11 @@ variable "lambda_timeout" {
   description = "Lambda timeout in seconds."
   type        = number
   default     = 30
+}
+
+variable "sns_lambda_environment" {
+  description = "Extra environment variables for the SNS Lambda (e.g. WEBHOOK_URL and WEBHOOK_SECRET_ARN when not using the module-managed webhook secret)."
+  type        = map(string)
+  default     = {}
 }
 
