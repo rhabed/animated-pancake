@@ -42,3 +42,6 @@ terraform.rc
 examples/**/.terraform/
 examples/**/*.tfstate
 examples/**/*.tfstate.*
+
+# Module: Lambda zip build output (archive_file)
+module/sns-lambda-*.zip

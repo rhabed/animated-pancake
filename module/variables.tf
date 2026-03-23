@@ -78,3 +78,39 @@ variable "event_channel_service_id" {
   default     = null
 }
 
+variable "enable_sns_lambda" {
+  description = "When true, create an SNS topic that invokes a Lambda function (you can replace the placeholder code under lambda/placeholder/ or set lambda_source_dir)."
+  type        = bool
+  default     = false
+}
+
+variable "sns_topic_display_name" {
+  description = "Human-readable display name for the SNS topic (defaults to agent_space_name when null)."
+  type        = string
+  default     = null
+}
+
+variable "lambda_source_dir" {
+  description = "Directory to zip for Lambda deployment. Defaults to the module's placeholder handler."
+  type        = string
+  default     = null
+}
+
+variable "lambda_runtime" {
+  description = "Lambda runtime for the SNS-triggered function."
+  type        = string
+  default     = "python3.12"
+}
+
+variable "lambda_handler" {
+  description = "Lambda handler (must match your deployment package)."
+  type        = string
+  default     = "lambda_function.lambda_handler"
+}
+
+variable "lambda_timeout" {
+  description = "Lambda timeout in seconds."
+  type        = number
+  default     = 30
+}
+

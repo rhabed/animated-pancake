@@ -37,6 +37,21 @@ output "event_channel_association_id" {
   value       = length(awscc_devopsagent_association.event_channel) > 0 ? awscc_devopsagent_association.event_channel[0].association_id : null
 }
 
+output "sns_topic_arn" {
+  description = "ARN of the SNS topic that invokes the Lambda (null when enable_sns_lambda is false)."
+  value       = length(aws_sns_topic.notifications) > 0 ? aws_sns_topic.notifications[0].arn : null
+}
+
+output "sns_lambda_function_arn" {
+  description = "ARN of the SNS-triggered Lambda function (null when enable_sns_lambda is false)."
+  value       = length(aws_lambda_function.sns_handler) > 0 ? aws_lambda_function.sns_handler[0].arn : null
+}
+
+output "sns_lambda_function_name" {
+  description = "Name of the SNS-triggered Lambda function (null when enable_sns_lambda is false)."
+  value       = length(aws_lambda_function.sns_handler) > 0 ? aws_lambda_function.sns_handler[0].function_name : null
+}
+
 output "manual_setup_instructions" {
   description = "Next steps and verification commands after deployment."
   value       = <<-EOT
