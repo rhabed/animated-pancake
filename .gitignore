@@ -45,3 +45,5 @@ examples/**/*.tfstate.*
 
 # Module: Lambda zip build output (archive_file)
 module/sns-lambda-*.zip
+
+**/.terraform.lock.hcl

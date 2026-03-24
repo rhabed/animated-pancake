@@ -24,9 +24,14 @@ resource "null_resource" "webhook_credentials" {
   ]
 
   triggers = {
-    association_id   = awscc_devopsagent_association.event_channel[0].association_id
-    agent_space_id   = awscc_devopsagent_agent_space.this.agent_space_id
-    signing_revision = sha256(coalesce(var.webhook_signing_secret, ""))
+    association_id = awscc_devopsagent_association.event_channel[0].association_id
+    agent_space_id = awscc_devopsagent_agent_space.this.agent_space_id
+    # coalesce() rejects all-null / all-empty arguments; use an explicit branch for "unset".
+    signing_revision = (
+      var.webhook_signing_secret != null && var.webhook_signing_secret != ""
+      ? sha256(nonsensitive(var.webhook_signing_secret))
+      : sha256("webhook_signing_secret_unset")
+    )
   }
 
   provisioner "local-exec" {
@@ -37,7 +42,7 @@ resource "null_resource" "webhook_credentials" {
       AGENT_SPACE_ID         = awscc_devopsagent_agent_space.this.agent_space_id
       ASSOCIATION_ID         = awscc_devopsagent_association.event_channel[0].association_id
       SECRET_ID              = aws_secretsmanager_secret.webhook_credentials[0].arn
-      WEBHOOK_SIGNING_SECRET = nonsensitive(coalesce(var.webhook_signing_secret, ""))
+      WEBHOOK_SIGNING_SECRET = nonsensitive(var.webhook_signing_secret != null ? var.webhook_signing_secret : "")
     }
   }
 }
