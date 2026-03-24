@@ -10,6 +10,7 @@ module "devops_agent" {
   external_account_ids     = []
   enable_webhook           = var.enable_webhook
   event_channel_service_id = var.event_channel_service_id
+  enable_sns_lambda        = var.enable_sns_lambda
   tags                     = var.tags
 }
 

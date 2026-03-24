@@ -38,6 +38,12 @@ variable "event_channel_service_id" {
   default = null
 }
 
+variable "enable_sns_lambda" {
+  description = "Create an SNS topic subscribed to the placeholder Lambda (set WEBHOOK_SECRET_ARN via module when enable_webhook and Secrets Manager webhook credentials are enabled)."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

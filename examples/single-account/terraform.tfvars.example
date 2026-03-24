@@ -8,6 +8,8 @@ auth_flow                = "iam"
 # enable_webhook = true
 # event_channel_service_id = null # optional; if null and enable_webhook=true, script will attempt to register/discover it
 
+# enable_sns_lambda = true
+
 # resource_discovery_tags = {
 #   Environment = "production"
 #   Application = "myapp"
