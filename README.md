@@ -30,6 +30,8 @@ cp terraform.tfvars.example terraform.tfvars
 ./scripts/post-deploy.sh
 ```
 
+**Webhook signing secret:** If you use the Event Channel (webhook) with Secrets Manager, Terraform can store the webhook URL after the association exists, but DevOps Agent does **not** expose the HMAC signing secret through the API. Create or view webhook credentials in the **DevOps Agent console** after the webhook exists, copy the secret, then either set the module variable `webhook_signing_secret` and run `terraform apply` again so the stored JSON is updated, or paste the value into the same secret in Secrets Manager manually.
+
 ### Cross account
 
 ```bash
