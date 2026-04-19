@@ -1,5 +1,5 @@
 module "devops_agent" {
-  source = "../../module"
+  source = "../../aws-devops-agent"
 
   aws_region               = var.aws_region
   agent_space_name         = var.agent_space_name
