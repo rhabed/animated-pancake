@@ -1,0 +1,177 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for AWS Security Agent module'
+
+Parameters:
+  AgentSpaceName:
+    Type: String
+    Description: Name for the Security Agent Space.
+
+  VpcArn:
+    Type: String
+    Default: ""
+    Description: ARN of the VPC where Security Agent resources will be associated.
+
+  SubnetArns:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: List of subnet ARNs to associate with the Security Agent Space.
+
+  SecurityGroupArns:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: List of security group ARNs to associate with the Security Agent Space.
+
+  EnableControlsScanning:
+    Type: String
+    AllowedValues: ['true', 'false', '']
+    Default: ''
+    Description: Enable controls scanning in code review.
+
+  EnableGeneralPurposeScanning:
+    Type: String
+    AllowedValues: ['true', 'false', '']
+    Default: ''
+    Description: Enable general purpose scanning in code review.
+
+  GithubIntegration:
+    Type: String
+    Default: ""
+    Description: Type of GitHub integration (e.g. 'github').
+
+  GithubRepositoriesJson:
+    Type: String
+    Default: "[]"
+    Description: "JSON string representing the list of GitHub repositories: '[{\"owner\": \"...\", \"name\": \"...\", \"remediateCode\": true}]'"
+
+  IamNamePrefix:
+    Type: String
+    Default: securityagent
+    Description: Prefix for IAM role/policy names.
+
+Conditions:
+  HasVpc: !Not [!Equals [!Ref VpcArn, ""]]
+  HasCodeReview: !Or
+    - !Not [!Equals [!Ref EnableControlsScanning, ""]]
+    - !Not [!Equals [!Ref EnableGeneralPurposeScanning, ""]]
+  HasGithub: !Not [!Equals [!Ref GithubIntegration, ""]]
+  HasSubnets: !Not [!Equals [!Join ["", !Ref SubnetArns], ""]]
+  HasSecurityGroups: !Not [!Equals [!Join ["", !Ref SecurityGroupArns], ""]]
+  HasControlsScanning: !Not [!Equals [!Ref EnableControlsScanning, ""]]
+  HasGeneralPurposeScanning: !Not [!Equals [!Ref EnableGeneralPurposeScanning, ""]]
+
+Resources:
+  # ------------------------------------------------------------------------------
+  # IAM role: SecurityAgentRole
+  # ------------------------------------------------------------------------------
+  SecurityAgentRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub "${IamNamePrefix}-AgentRole"
+      Description: "IAM role for AWS Security Agent Space"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: security-agent.amazonaws.com
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSecurityAgentServiceRolePolicy'
+
+  SecurityAgentCustomPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Sub "${IamNamePrefix}-Custom"
+      Roles:
+        - !Ref SecurityAgentRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: SecurityHubReadAccess
+            Effect: Allow
+            Action:
+              - 'securityhub:GetFindings'
+              - 'securityhub:ListFindings'
+              - 'securityhub:DescribeHub'
+              - 'securityhub:GetInsights'
+              - 'securityhub:GetInsightResults'
+            Resource: ['*']
+          - Sid: InspectorReadAccess
+            Effect: Allow
+            Action:
+              - 'inspector2:ListFindings'
+              - 'inspector2:GetFinding'
+              - 'inspector2:ListCoverage'
+              - 'inspector2:BatchGetAccountStatus'
+            Resource: ['*']
+          - Sid: GuardDutyReadAccess
+            Effect: Allow
+            Action:
+              - 'guardduty:ListDetectors'
+              - 'guardduty:GetDetector'
+              - 'guardduty:ListFindings'
+              - 'guardduty:GetFindings'
+            Resource: ['*']
+          - Sid: CodeReviewAccess
+            Effect: Allow
+            Action:
+              - 'codeguru-reviewer:ListRepositoryAssociations'
+              - 'codeguru-reviewer:DescribeRepositoryAssociation'
+              - 'codeguru-reviewer:ListCodeReviews'
+              - 'codeguru-reviewer:DescribeCodeReview'
+            Resource: ['*']
+
+  # ------------------------------------------------------------------------------
+  # AWS Security Agent — Agent Space
+  # ------------------------------------------------------------------------------
+  AgentSpace:
+    Type: 'AWS::SecurityAgent::AgentSpace'
+    Properties:
+      Name: !Ref AgentSpaceName
+      AwsResources:
+        Fn::If:
+          - HasVpc
+          - VpcArn: !Ref VpcArn
+            SubnetArns:
+              Fn::If:
+                - HasSubnets
+                - !Ref SubnetArns
+                - !Ref 'AWS::NoValue'
+            SecurityGroupArns:
+              Fn::If:
+                - HasSecurityGroups
+                - !Ref SecurityGroupArns
+                - !Ref 'AWS::NoValue'
+          - !Ref 'AWS::NoValue'
+      CodeReviewSettings:
+        Fn::If:
+          - HasCodeReview
+          - ControlsScanning:
+              Fn::If:
+                - HasControlsScanning
+                - !Ref EnableControlsScanning
+                - !Ref 'AWS::NoValue'
+            GeneralPurposeScanning:
+              Fn::If:
+                - HasGeneralPurposeScanning
+                - !Ref EnableGeneralPurposeScanning
+                - !Ref 'AWS::NoValue'
+          - !Ref 'AWS::NoValue'
+      IntegratedResources:
+        Fn::If:
+          - HasGithub
+          - - Integration: !Ref GithubIntegration
+              ProviderResources: !Ref GithubRepositoriesJson
+          - !Ref 'AWS::NoValue'
+
+Outputs:
+  AgentSpaceId:
+    Description: The ID of the created Security Agent Space.
+    Value: !GetAtt AgentSpace.AgentSpaceId
+
+  AgentSpaceArn:
+    Description: The ARN of the created Security Agent Space.
+    Value: !Sub "arn:aws:security-agent:${AWS::Region}:${AWS::AccountId}:agentspace/${AgentSpace.AgentSpaceId}"

@@ -1,0 +1,303 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for AWS DevOps Agent module'
+
+Parameters:
+  AgentSpaceName:
+    Type: String
+    Description: Name for the Agent Space (logical container for DevOps Agent configuration).
+    Default: MyAgentSpace
+
+  AgentSpaceDescription:
+    Type: String
+    Description: Description for the Agent Space.
+    Default: AgentSpace for monitoring my application
+
+  EnableOperatorApp:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: Enable the Operator App web interface for interactive investigations.
+
+  AuthFlow:
+    Type: String
+    AllowedValues: ['iam', 'idc']
+    Default: 'iam'
+    Description: "Authentication flow for the Operator App: 'iam' (IAM identity) or 'idc' (IAM Identity Center)."
+
+  IamNamePrefix:
+    Type: String
+    Default: devopsagent
+    Description: Prefix for IAM role/policy names.
+
+  EnableSnsLambda:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: When true, create an SNS topic that invokes a Lambda function.
+
+  SnsTopicDisplayName:
+    Type: String
+    Default: ""
+    Description: Human-readable display name for the SNS topic.
+
+  LambdaRuntime:
+    Type: String
+    Default: "python3.12"
+    Description: Lambda runtime for the SNS-triggered function.
+
+  LambdaHandler:
+    Type: String
+    Default: "lambda_function.lambda_handler"
+    Description: Lambda handler.
+
+  LambdaTimeout:
+    Type: Number
+    Default: 30
+    Description: Lambda timeout in seconds.
+
+  SecurityGroupIds:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: Optional list of security group IDs for the SNS Lambda function.
+
+  SubnetIds:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: Optional list of subnet IDs for the SNS Lambda function.
+
+Conditions:
+  UseOperatorApp: !Equals [!Ref EnableOperatorApp, 'true']
+  AuthFlowIsIam: !Equals [!Ref AuthFlow, 'iam']
+  CreateWebappAdminRole: !And [!Condition UseOperatorApp, !Condition AuthFlowIsIam]
+  EnableSnsLambdaCondition: !Equals [!Ref EnableSnsLambda, 'true']
+  HasVpcConfig: !Not [!Equals [!Join ["", !Ref SubnetIds], ""]]
+  UseDefaultSnsTopicDisplayName: !Equals [!Ref SnsTopicDisplayName, ""]
+
+Resources:
+  # ------------------------------------------------------------------------------
+  # IAM role: DevOpsAgentRole-AgentSpace
+  # ------------------------------------------------------------------------------
+  AgentSpaceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub "${IamNamePrefix}-AgentSpace"
+      Description: "IAM role for AWS DevOps Agent Space (primary account)"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: aidevops.amazonaws.com
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
+              ArnLike:
+                'aws:SourceArn': !Sub "arn:aws:aidevops:${AWS::Region}:${AWS::AccountId}:agentspace/*"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AIOpsAssistantPolicy'
+
+  AgentSpaceCustomPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Sub "${IamNamePrefix}-AgentSpace-Custom"
+      Roles:
+        - !Ref AgentSpaceRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowAwsSupportActions
+            Effect: Allow
+            Action:
+              - 'support:CreateCase'
+              - 'support:DescribeCases'
+            Resource: ['*']
+          - Sid: AllowExpandedAIOpsAssistantPolicy
+            Effect: Allow
+            Action:
+              - 'aidevops:GetKnowledgeItem'
+              - 'aidevops:ListKnowledgeItems'
+              - 'eks:AccessKubernetesApi'
+              - 'synthetics:GetCanaryRuns'
+              - 'route53:GetHealthCheckStatus'
+              - 'resource-explorer-2:Search'
+              - 'codedeploy:GetDeploymentTarget'
+              - 'ram:GetResourceShares'
+            Resource: ['*']
+          - Sid: AllowCreateServiceLinkedRoles
+            Effect: Allow
+            Action: ['iam:CreateServiceLinkedRole']
+            Resource:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/resource-explorer-2.amazonaws.com/AWSServiceRoleForResourceExplorer"
+
+  # ------------------------------------------------------------------------------
+  # IAM role: DevOpsAgentRole-WebappAdmin (conditional)
+  # ------------------------------------------------------------------------------
+  WebappAdminRole:
+    Type: 'AWS::IAM::Role'
+    Condition: CreateWebappAdminRole
+    Properties:
+      RoleName: !Sub "${IamNamePrefix}-WebappAdmin"
+      Description: "IAM role for AWS DevOps Agent Operator App (web app admin)"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: aidevops.amazonaws.com
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AIOpsOperatorAccess'
+
+  WebappAdminCustomPolicy:
+    Type: 'AWS::IAM::Policy'
+    Condition: CreateWebappAdminRole
+    Properties:
+      PolicyName: !Sub "${IamNamePrefix}-WebappAdmin-Custom"
+      Roles:
+        - !Ref WebappAdminRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowBasicOperatorActions
+            Effect: Allow
+            Action:
+              - 'aidevops:GetAgentSpace'
+              - 'aidevops:GetAssociation'
+              - 'aidevops:ListAssociations'
+              - 'aidevops:CreateBacklogTask'
+              - 'aidevops:GetBacklogTask'
+              - 'aidevops:UpdateBacklogTask'
+              - 'aidevops:ListBacklogTasks'
+              - 'aidevops:ListJournalRecords'
+              - 'aidevops:DiscoverTopology'
+              - 'aidevops:ListGoals'
+              - 'aidevops:ListRecommendations'
+              - 'aidevops:ListExecutions'
+              - 'aidevops:GetRecommendation'
+              - 'aidevops:UpdateRecommendation'
+              - 'aidevops:CreateKnowledgeItem'
+              - 'aidevops:ListKnowledgeItems'
+              - 'aidevops:GetKnowledgeItem'
+              - 'aidevops:UpdateKnowledgeItem'
+              - 'aidevops:DeleteKnowledgeItem'
+              - 'aidevops:ListPendingMessages'
+              - 'aidevops:InitiateChatForCase'
+              - 'aidevops:EndChatForCase'
+              - 'aidevops:DescribeSupportLevel'
+              - 'aidevops:GetAccountUsage'
+              - 'aidevops:SendChatMessage'
+              - 'aidevops:ListChats'
+              - 'aidevops:CreateChat'
+              - 'aidevops:StreamMessage'
+            Resource: !Sub "arn:aws:aidevops:${AWS::Region}:${AWS::AccountId}:agentspace/*"
+          - Sid: AllowSupportOperatorActions
+            Effect: Allow
+            Action:
+              - 'support:DescribeCases'
+              - 'support:InitiateChatForCase'
+              - 'support:DescribeSupportLevel'
+            Resource: '*'
+
+  # ------------------------------------------------------------------------------
+  # AWS DevOps Agent — Agent Space
+  # ------------------------------------------------------------------------------
+  AgentSpace:
+    Type: 'AWS::DevOpsAgent::AgentSpace'
+    Properties:
+      Name: !Ref AgentSpaceName
+      Description: !Ref AgentSpaceDescription
+      # UseOperatorApp check logic matches Terraform:
+      # if enable_operator_app then (if auth_flow == iam then {iam: {role_arn}} else {iam: null, idc: {}}) else null
+      OperatorApp:
+        Fn::If:
+          - UseOperatorApp
+          - Fn::If:
+            - AuthFlowIsIam
+            - Iam:
+                OperatorAppRoleArn: !GetAtt WebappAdminRole.Arn
+            - Idc: {}
+          - !Ref 'AWS::NoValue'
+
+  # ------------------------------------------------------------------------------
+  # SNS topic → Lambda (optional)
+  # ------------------------------------------------------------------------------
+  SnsLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Condition: EnableSnsLambdaCondition
+    Properties:
+      RoleName: !Sub "${IamNamePrefix}-SnsLambda"
+      Description: "Execution role for SNS-triggered Lambda (DevOps Agent module)"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+
+  SnsHandler:
+    Type: 'AWS::Lambda::Function'
+    Condition: EnableSnsLambdaCondition
+    Properties:
+      FunctionName: !Sub "${IamNamePrefix}-sns-handler"
+      Description: "Invoked by SNS (placeholder handler)"
+      Role: !GetAtt SnsLambdaRole.Arn
+      Handler: !Ref LambdaHandler
+      Runtime: !Ref LambdaRuntime
+      Timeout: !Ref LambdaTimeout
+      VpcConfig:
+        !If
+          - HasVpcConfig
+          - SecurityGroupIds: !Ref SecurityGroupIds
+            SubnetIds: !Ref SubnetIds
+          - !Ref 'AWS::NoValue'
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              print("Received event: " + str(event))
+              return {"statusCode": 200, "body": "Success"}
+
+  NotificationsTopic:
+    Type: 'AWS::SNS::Topic'
+    Condition: EnableSnsLambdaCondition
+    Properties:
+      TopicName: !Sub "${IamNamePrefix}-notifications"
+      DisplayName: !If [UseDefaultSnsTopicDisplayName, !Ref AgentSpaceName, !Ref SnsTopicDisplayName]
+
+  SnsInvokePermission:
+    Type: 'AWS::Lambda::Permission'
+    Condition: EnableSnsLambdaCondition
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt SnsHandler.Arn
+      Principal: 'sns.amazonaws.com'
+      SourceArn: !Ref NotificationsTopic
+
+  LambdaSubscription:
+    Type: 'AWS::SNS::Subscription'
+    Condition: EnableSnsLambdaCondition
+    Properties:
+      TopicArn: !Ref NotificationsTopic
+      Protocol: lambda
+      Endpoint: !GetAtt SnsHandler.Arn
+
+Outputs:
+  AgentSpaceId:
+    Description: The ID of the created Agent Space.
+    Value: !GetAtt AgentSpace.AgentSpaceId
+
+  AgentSpaceArn:
+    Description: The ARN of the created Agent Space.
+    Value: !Sub "arn:aws:aidevops:${AWS::Region}:${AWS::AccountId}:agentspace/${AgentSpace.AgentSpaceId}"
+
+  NotificationsTopicArn:
+    Description: ARN of the SNS topic for notifications.
+    Condition: EnableSnsLambdaCondition
+    Value: !Ref NotificationsTopic

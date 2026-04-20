@@ -50,3 +50,5 @@ module/sns-lambda-*.zip
 
 # TF Plan files
 **/tfplan
+
+.venv/
