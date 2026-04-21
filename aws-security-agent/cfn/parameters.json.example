@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "AgentSpaceName",
+    "ParameterValue": "SecurityAgentSpace"
+  },
+  {
+    "ParameterKey": "IamNamePrefix",
+    "ParameterValue": "cfn-security"
+  },
+  {
+    "ParameterKey": "VpcArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "EnableControlsScanning",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "EnableGeneralPurposeScanning",
+    "ParameterValue": "true"
+  }
+]

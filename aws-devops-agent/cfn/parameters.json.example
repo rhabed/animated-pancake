@@ -1,0 +1,34 @@
+[
+  {
+    "ParameterKey": "AgentSpaceName",
+    "ParameterValue": "DevOpsAgentSpace"
+  },
+  {
+    "ParameterKey": "AgentSpaceDescription",
+    "ParameterValue": "CloudFormation managed DevOps Agent Space"
+  },
+  {
+    "ParameterKey": "EnableOperatorApp",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "AuthFlow",
+    "ParameterValue": "iam"
+  },
+  {
+    "ParameterKey": "IamNamePrefix",
+    "ParameterValue": "cfn-devops"
+  },
+  {
+    "ParameterKey": "EnableSnsLambda",
+    "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "SecurityGroupIds",
+    "ParameterValue": "sg-12345678"
+  },
+  {
+    "ParameterKey": "SubnetIds",
+    "ParameterValue": "subnet-12345678,subnet-87654321"
+  }
+]

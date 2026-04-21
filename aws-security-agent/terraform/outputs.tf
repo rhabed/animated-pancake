@@ -9,12 +9,12 @@ output "agent_space_id" {
 
 output "agent_space_account_id" {
   description = "AWS account ID where the Security Agent Space is managed."
-  value       = awscc_securityagent_agent_space.this.account_id
+  value       = local.account_id
 }
 
 output "agent_space_region" {
   description = "AWS region where the Security Agent Space is managed."
-  value       = awscc_securityagent_agent_space.this.region
+  value       = local.region
 }
 
 output "agent_space_name" {

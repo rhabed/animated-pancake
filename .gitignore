@@ -47,3 +47,10 @@ examples/**/*.tfstate.*
 module/sns-lambda-*.zip
 
 **/.terraform.lock.hcl
+
+# TF Plan files
+**/tfplan
+
+.venv/
+.agent/
+openspec/

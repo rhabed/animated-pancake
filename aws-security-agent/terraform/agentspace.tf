@@ -23,12 +23,12 @@ resource "awscc_securityagent_agent_space" "this" {
 
   # ── Code review scanning settings (optional) ───────────────────────────────
   code_review_settings = local.has_code_review ? {
-    controls_scanning      = var.enable_controls_scanning
+    controls_scanning        = var.enable_controls_scanning
     general_purpose_scanning = var.enable_general_purpose_scanning
   } : null
 
   # ── GitHub integrated resources (optional) ──────────────────────────────────
-  integrated_resources = local.has_github ? {
+  integrated_resources = local.has_github ? [{
     integration = var.github_integration
     provider_resources = [
       for repo in var.github_repositories : {
@@ -41,7 +41,7 @@ resource "awscc_securityagent_agent_space" "this" {
         }
       }
     ]
-  } : null
+  }] : null
 
   # ── Tags ──────────────────────────────────────────────────────────────────
   tags = length(local.resource_tags) > 0 ? local.resource_tags : null
