@@ -1,5 +1,5 @@
 module "devops_agent" {
-  source = "../../aws-devops-agent"
+  source = "../../aws-devops-agent/terraform"
 
   aws_region               = var.aws_region
   agent_space_name         = var.agent_space_name
@@ -13,4 +13,3 @@ module "devops_agent" {
   enable_sns_lambda        = var.enable_sns_lambda
   tags                     = var.tags
 }
-

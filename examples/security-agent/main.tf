@@ -6,7 +6,7 @@
 # ------------------------------------------------------------------------------
 
 module "security_agent" {
-  source = "../../aws-security-agent"
+  source = "../../aws-security-agent/terraform"
 
   aws_region       = var.aws_region
   agent_space_name = var.agent_space_name

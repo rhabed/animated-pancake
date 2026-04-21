@@ -1,5 +1,5 @@
 module "devops_agent" {
-  source = "../../aws-devops-agent"
+  source = "../../aws-devops-agent/terraform"
 
   aws_region               = var.aws_region
   agent_space_name         = var.agent_space_name
@@ -12,4 +12,3 @@ module "devops_agent" {
   event_channel_service_id = var.event_channel_service_id
   tags                     = var.tags
 }
-

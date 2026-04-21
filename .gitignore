@@ -52,3 +52,5 @@ module/sns-lambda-*.zip
 **/tfplan
 
 .venv/
+.agent/
+openspec/
